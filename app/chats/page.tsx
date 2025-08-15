@@ -1,5 +1,6 @@
 "use client";
 
+import SearchBar from "@/components/search_bar";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -12,6 +13,7 @@ export default function Chats() {
     const [chatMessages, setChatMessages] = useState([]);
     const [_, setRealtimeMessages] = useState([]);
     const [notifiedChat, setNotifiedChat] = useState(null);
+    const [searchResults, setSearchResults] = useState([]);
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -150,14 +152,52 @@ export default function Chats() {
         };
     }, [token, selectedChat]);
 
+    const handleSearch = async (query) => {
+        if (!query || query.trim() === "") {
+            setSearchResults([]);
+            return;
+        }
+
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/users/${query}`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            const json = await res.json();
+            console.log("Search results:", json);
+            if (json === null) {
+                setSearchResults([]);
+            } else {
+                setSearchResults([json]);
+            }
+            return json;
+        } catch (error) {
+            console.error('Failed to fetch search for user:', error);
+        }
+    };
+
     return (
         <div className="w-full h-screen gap-4 bg-black text-blue-300 font-mono text-4xl flex justify-center items-center">
-            <div className="w-1/3 h-screen px-6 py-8 flex flex-col items-start justify-start pl-4 pt-4 bg-gray-900">
+            <div className="w-1/3 h-screen px-6 py-8 flex flex-col gap-3 items-start justify-start pl-4 pt-4 bg-gray-900">
                 <h1 className="text-gray-100 text-4xl">Hello, {userdata?.full_name} ({userdata?.user_name})!</h1>
+                <SearchBar onSearch={handleSearch} />
+                {searchResults && searchResults.length > 0 ?
+                    <div className="search-list flex flex-col gap-2 border-2 border-gray-700 p-2 rounded-md bg-gray-800">
+                        {searchResults.map(user => (
+                            <div key={user.id} className="text-gray-100">
+                                {user.username}
+                            </div>
+                        ))}
+                    </div> : (
+                        <>  </>
+                    )}
                 <div className="flex-1 overflow-y-auto">
                     <ul>
                         {
-                            chats.length > 0 ? chats.map(chat => (
+                            chats && chats.length > 0 ? chats.map(chat => (
                                 chat.id === notifiedChat ? (
                                     <div className="flex gap-2" key={chat.id}>
                                         <li className="text-gray-200 font-bold my-3">
