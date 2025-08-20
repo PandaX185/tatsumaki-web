@@ -1,5 +1,7 @@
 "use client";
 
+import FAB from "@/components/fab";
+import SearchModal from "@/components/search_bar";
 import SearchBar from "@/components/search_bar";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -11,9 +13,11 @@ export default function Chats() {
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [chatMessages, setChatMessages] = useState([]);
-    const [_, setRealtimeMessages] = useState([]);
     const [notifiedChat, setNotifiedChat] = useState(null);
     const [searchResults, setSearchResults] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedUsers, setSelectedUsers] = useState([]);
+
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -27,10 +31,6 @@ export default function Chats() {
                     }
                 });
 
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
-                }
-
                 const json = await res.json();
                 setUserData(json);
             } catch (error) {
@@ -43,27 +43,28 @@ export default function Chats() {
         }
     }, [token]);
 
-    useEffect(() => {
-        const fetchChats = async () => {
-            try {
-                const res = await fetch(`${API_BASE_URL}/api/chats`, {
-                    method: "GET",
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                });
-
-                if (!res.ok) {
-                    throw new Error(`HTTP error! status: ${res.status}`);
+    const fetchChats = async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/chats`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`
                 }
+            });
 
-                const json = await res.json();
-                setChats(json);
-                console.log(json);
-            } catch (error) {
-                console.error('Failed to fetch chats:', error);
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
             }
-        };
+
+            const json = await res.json();
+            setChats(json);
+            return json;
+        } catch (error) {
+            console.error('Failed to fetch chats:', error);
+        }
+    };
+
+    useEffect(() => {
 
         if (token) {
             fetchChats();
@@ -171,7 +172,7 @@ export default function Chats() {
             if (json === null) {
                 setSearchResults([]);
             } else {
-                setSearchResults([json]);
+                setSearchResults(json);
             }
             return json;
         } catch (error) {
@@ -179,72 +180,91 @@ export default function Chats() {
         }
     };
 
+    const handleUserSelect = (user) => {
+        console.log("Selected user:", user);
+        setSelectedUsers((prevSelected) => {
+            if (prevSelected.some(u => u.id === user.id)) return prevSelected;
+            return [...prevSelected, user];
+        });
+    };
+
     return (
         <div className="w-full h-screen gap-4 bg-black text-blue-300 font-mono text-4xl flex justify-center items-center">
-            <div className="w-1/3 h-screen px-6 py-8 flex flex-col gap-3 items-start justify-start pl-4 pt-4 bg-gray-900">
-                <h1 className="text-gray-100 text-4xl">Hello, {userdata?.full_name} ({userdata?.user_name})!</h1>
-                <SearchBar onSearch={handleSearch} />
-                {searchResults && searchResults.length > 0 ?
-                    <div className="search-list flex flex-col gap-2 border-2 border-gray-700 p-2 rounded-md bg-gray-800">
-                        {searchResults.map(user => (
-                            <div key={user.id} className="text-gray-100">
-                                {user.username}
-                            </div>
-                        ))}
-                    </div> : (
-                        <>  </>
-                    )}
-                <div className="flex-1 overflow-y-auto">
-                    <ul>
-                        {
-                            chats && chats.length > 0 ? chats.map(chat => (
-                                chat.id === notifiedChat ? (
-                                    <div className="flex gap-2" key={chat.id}>
-                                        <li className="text-gray-200 font-bold my-3">
+            <div className="flex w-full h-screen gap-4">
+                <div className="w-1/3 h-screen px-6 py-8 flex flex-col gap-3 items-start justify-start bg-gray-900 relative">
+                    <h1 className="text-gray-100 text-4xl">Hello, {userdata?.full_name} ({userdata?.user_name})!</h1>
+                    <div className="flex-1 overflow-y-auto w-full">
+                        <ul>
+                            {
+                                chats && chats.length > 0 ? chats.map(chat => (
+                                    chat.id === notifiedChat ? (
+                                        <div className="flex gap-2" key={chat.id}>
+                                            <li className="text-gray-200 font-bold my-3">
+                                                <a href="#" onClick={() => {
+                                                    setSelectedChat(chat);
+                                                    setNotifiedChat(null);
+                                                }}>{chat.chat_name}</a>
+                                            </li>
+                                            <p className="text-red-300">NEW</p>
+                                        </div>
+                                    ) : (
+                                        <li key={chat.id} className="text-gray-200 my-3">
                                             <a href="#" onClick={() => {
+                                                if (chat.id == notifiedChat) setNotifiedChat(null);
                                                 setSelectedChat(chat);
-                                                setNotifiedChat(null);
                                             }}>{chat.chat_name}</a>
                                         </li>
-                                        <p className="text-red-300">NEW</p>
-                                    </div>
-                                ) : (
-                                    <li key={chat.id} className="text-gray-200 my-3">
-                                        <a href="#" onClick={() => {
-                                            if (chat.id == notifiedChat) setNotifiedChat(null);
-                                            setSelectedChat(chat);
-                                        }}>{chat.chat_name}</a>
-                                    </li>
-                                )
-                            )) : <h2 className="text-gray-400">Your chats will appear here.</h2>
+                                    )
+                                )) : <h2 className="text-gray-400">Your chats will appear here.</h2>
+                            }
+                        </ul>
+                    </div>
 
-                        }
-                    </ul>
-                </div>
-            </div>
-            <div className="w-2/3 h-screen flex flex-col-reverse bg-gray-900 p-6">
-                <div className="flex-1 overflow-y-auto">
-                    {selectedChat ? (
-                        <>
-                            <h2 className="text-gray-100 text-2xl mb-4">{selectedChat?.chat_name}</h2>
-                            {chatMessages.length > 0 ? (
-                                <ul>
-                                    {chatMessages.map(message => (
-                                        <li key={message.id} className="text-gray-200 my-2">
-                                            <strong>{message.sender_id}:</strong> {message.content}
-                                        </li>
-                                    ))}
-                                </ul>
-                            ) : (
-                                <div className="text-gray-400">No messages.</div>
-                            )}
-                        </>
-                    ) : (
-                        <>
-                            <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
-                            <div className="text-gray-400">Select a chat to view messages.</div>
-                        </>
+                    <FAB onClick={() => setShowModal(true)} />
+
+                    {showModal && (
+                        <SearchModal
+                            show={showModal}
+                            onClose={async () => {
+                                setShowModal(false);
+                                setSearchResults([]);
+                                setSelectedUsers([]);
+                                fetchChats().then((chats) => {
+                                    setSelectedChat(chats[0]);
+                                });
+                            }}
+                            onSearch={handleSearch}
+                            searchResults={searchResults}
+                            onUserSelect={handleUserSelect}
+                            selectedUsers={selectedUsers}
+                            token={token}
+                        />
                     )}
+                </div>
+                <div className="w-2/3 h-screen flex flex-col-reverse bg-gray-900 p-6">
+                    <div className="flex-1 overflow-y-auto">
+                        {selectedChat ? (
+                            <>
+                                <h2 className="text-gray-100 text-2xl mb-4">{selectedChat?.chat_name}</h2>
+                                {chatMessages.length > 0 ? (
+                                    <ul>
+                                        {chatMessages.map(message => (
+                                            <li key={message.id} className="text-gray-200 my-2">
+                                                <strong>{message.sender_id}:</strong> {message.content}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div className="text-gray-400">No messages.</div>
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
+                                <div className="text-gray-400">Select a chat to view messages.</div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
