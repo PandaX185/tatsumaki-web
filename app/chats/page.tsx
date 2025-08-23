@@ -1,8 +1,8 @@
 "use client";
 
 import FAB from "@/components/fab";
+import MessageInput from "@/components/message_input";
 import SearchModal from "@/components/search_bar";
-import SearchBar from "@/components/search_bar";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -122,11 +122,10 @@ export default function Chats() {
                 }
 
                 setChats(prevChats => {
+                    if (!prevChats) return prevChats;
                     const targetChat = prevChats.find(chat => chat.id === message.chat_id);
-                    console.log("target:", targetChat)
                     if (targetChat && (!selectedChat || message.chat_id !== selectedChat.id)) {
                         setNotifiedChat(message.chat_id);
-                        console.log("Notified chat:", notifiedChat)
                     }
                     return prevChats;
                 });
@@ -188,6 +187,36 @@ export default function Chats() {
         });
     };
 
+    const handleSendMessage = async (message) => {
+        if (!selectedChat) return;
+
+        try {
+            console.log(userdata);
+            const res = await fetch(`${API_BASE_URL}/api/messages`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    chat_id: selectedChat.id,
+                    sender_id: +userdata.id,
+                    content: message
+                })
+            });
+
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+
+            const json = await res.json();
+            console.log("Message sent:", json);
+            return json;
+        } catch (error) {
+            console.error('Failed to send message:', error);
+        }
+    };
+
     return (
         <div className="w-full h-screen gap-4 bg-black text-blue-300 font-mono text-4xl flex justify-center items-center">
             <div className="flex w-full h-screen gap-4">
@@ -230,7 +259,9 @@ export default function Chats() {
                                 setSearchResults([]);
                                 setSelectedUsers([]);
                                 fetchChats().then((chats) => {
-                                    setSelectedChat(chats[0]);
+                                    if (chats && chats.length > 0) {
+                                        setSelectedChat(chats[0]);
+                                    }
                                 });
                             }}
                             onSearch={handleSearch}
@@ -241,30 +272,33 @@ export default function Chats() {
                         />
                     )}
                 </div>
-                <div className="w-2/3 h-screen flex flex-col-reverse bg-gray-900 p-6">
-                    <div className="flex-1 overflow-y-auto">
-                        {selectedChat ? (
-                            <>
-                                <h2 className="text-gray-100 text-2xl mb-4">{selectedChat?.chat_name}</h2>
-                                {chatMessages.length > 0 ? (
-                                    <ul>
-                                        {chatMessages.map(message => (
-                                            <li key={message.id} className="text-gray-200 my-2">
-                                                <strong>{message.sender_id}:</strong> {message.content}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="text-gray-400">No messages.</div>
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
-                                <div className="text-gray-400">Select a chat to view messages.</div>
-                            </>
-                        )}
+                <div className="flex flex-col space-between h-screen w-2/3 bg-gray-900 p-6">
+                    <div className="w-full h-screen flex flex-col-reverse">
+                        <div className="flex-1 overflow-y-auto">
+                            {selectedChat ? (
+                                <>
+                                    <h2 className="text-gray-100 text-2xl mb-4">{selectedChat?.chat_name}</h2>
+                                    {chatMessages.length > 0 ? (
+                                        <ul>
+                                            {chatMessages.map(message => (
+                                                <li key={message.id} className="text-gray-200 my-2">
+                                                    <strong>{message.sender_id}:</strong> {message.content}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <div className="text-gray-400">No messages.</div>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
+                                    <div className="text-gray-400">Select a chat to view messages.</div>
+                                </>
+                            )}
+                        </div>
                     </div>
+                    <MessageInput onSendMessage={handleSendMessage} token={token} chatId={selectedChat?.id} />
                 </div>
             </div>
         </div>
