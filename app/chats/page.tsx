@@ -154,7 +154,7 @@ export default function Chats() {
                 eventSource.close();
             }
         };
-    }, [token, selectedChat]);
+    }, [token]);
 
     const handleSearch = async (query) => {
         if (!query || query.trim() === "") {
@@ -220,23 +220,57 @@ export default function Chats() {
         }
     };
 
-    useEffect(() => {
-        fetch(`${API_BASE_URL}/api/messages/unread`, {
-            method: "GET",
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        })
-            .then((res) => {
-                return res.json();
-            })
-            .then((data) => {
+    const fetchUnreadMessages = async () => {
+        let eventSource = null;
+
+        try {
+            eventSource = new EventSource(`${API_BASE_URL}/api/realtime/messages/unread?token=${encodeURIComponent(token)}`);
+
+            eventSource.addEventListener("unread", (event) => {
+                console.log("Unread messages:", event.data);
+                const data = JSON.parse(event.data);
                 setUnreadMessages(data);
-            })
-            .catch((error) => {
-                console.error('Failed to fetch unread chats:', error);
             });
+
+            eventSource.onerror = (err) => {
+                console.log("EventSource error:", err);
+                console.log("ReadyState:", eventSource.readyState);
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    console.log("Connection closed");
+                }
+            };
+        } catch (error) {
+            console.error('Failed to fetch unread messages:', error);
+        }
+
+        return () => {
+            if (eventSource) {
+                console.log("Closing EventSource connection");
+                eventSource.close();
+            }
+        };
+    }
+
+    useEffect(() => {
+        if (token) {
+            fetchUnreadMessages();
+        }
     }, [token]);
+
+    const markChatAsRead = async (chatId) => {
+        const res = await fetch(`${API_BASE_URL}/api/messages/${chatId}/read`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        console.log(res);
+        if (!res.ok) {
+            console.error('Failed to mark chat as read:', res.statusText);
+        }
+    };
 
     return (
         <div className="w-full h-screen gap-4 flex justify-center items-center">
@@ -247,19 +281,19 @@ export default function Chats() {
                         <ul>
                             {
                                 chats && chats.length > 0 ? chats.map(chat => (
-                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.id).includes(chat.id) ? (
-                                        <div className="flex gap-2" key={chat.id}>
-                                            <li className="chat-name">
-                                                <a href="#" onClick={(e) => {
-                                                    e.preventDefault();
-                                                    setSelectedChat(chat);
-                                                }}>{chat.chat_name}</a>
-                                            </li>
+                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && chat.id != selectedChat ? (
+                                        <div className="flex gap-2 chat-name" key={chat.id} onClick={(e) => {
+                                            e.preventDefault();
+                                            setSelectedChat(chat);
+                                            markChatAsRead(chat.id);
+                                        }}>
+                                            <p>{chat.chat_name}</p>
                                             <p className="text-red-300">NEW</p>
                                         </div>
                                     ) : (
                                         <li key={chat.id} onClick={() => {
                                             setSelectedChat(chat);
+                                            markChatAsRead(chat.id);
                                         }} className="chat-name">
                                             {chat.chat_name}
                                         </li>
@@ -280,6 +314,7 @@ export default function Chats() {
                                 fetchChats().then((chats) => {
                                     if (chats && chats.length > 0) {
                                         setSelectedChat(chats[0]);
+                                        markChatAsRead(chats[0].id);
                                     }
                                 });
                             }}
