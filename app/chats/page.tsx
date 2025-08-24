@@ -2,7 +2,7 @@
 
 import FAB from "@/components/fab";
 import MessageInput from "@/components/message_input";
-import SearchModal from "@/components/search_bar";
+import Modal from "@/components/modal";
 import { time } from "console";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -16,9 +16,12 @@ export default function Chats() {
     const [chatMessages, setChatMessages] = useState([]);
     const [unreadMessages, setUnreadMessages] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
-    const [showModal, setShowModal] = useState(false);
+    const [showSearchModal, setShowSearchModal] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState([]);
-
+    const [showEditModal, setShowEditModal] = useState(false);
+    const [chatMembers, setChatMembers] = useState([]);
+    const [editingChat, setEditingChat] = useState(null);
+    const [chatMembersData, setChatMembersData] = useState([]);
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -274,6 +277,69 @@ export default function Chats() {
         }
     };
 
+    const handleDeleteChat = async (chatId) => {
+        console.log("Chat: ", chatId);
+        const res = await fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
+            method: "DELETE",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        if (!res.ok) {
+            console.error('Failed to delete chat:', res.statusText);
+        }
+
+        setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+    };
+
+    const handleEditChat = (chatId, updatedBody) => {
+        fetch(`${API_BASE_URL}/api/chats/${chatId}`, {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify(updatedBody)
+        }).then(res => res.json()).then(data => {
+            console.log('Chat updated:', data);
+            // Update local state with the updated chat
+            setChats(prevChats =>
+                prevChats.map(chat =>
+                    chat.id === chatId ? { ...chat, ...data } : chat
+                )
+            );
+            if (selectedChat && selectedChat.id === chatId) {
+                setSelectedChat(prev => ({ ...prev, ...data }));
+            }
+        }).catch(error => {
+            console.error('Error updating chat:', error);
+        });
+    };
+
+    const fetchChatMembers = async (chatId) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/chats/${chatId}/members`, {
+                method: "GET",
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+
+            if (!res.ok) {
+                throw new Error(`HTTP error! status: ${res.status}`);
+            }
+
+            const json = await res.json();
+            setChatMembersData(json || []);
+            return json;
+        } catch (error) {
+            console.error('Failed to fetch chat members:', error);
+            setChatMembersData([]);
+        }
+    };
+
     return (
         <div className="w-full h-screen gap-4 flex justify-center items-center">
             <div className="flex w-full h-screen gap-4">
@@ -282,35 +348,63 @@ export default function Chats() {
                     <div className="flex-1 overflow-y-auto w-full">
                         <ul>
                             {
-                                chats && chats.length > 0 ? chats.map(chat => (
-                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && (selectedChat === null || chat.id != selectedChat.id) ? (
-                                        <div className="flex gap-2 chat-name" key={chat.id} onClick={(e) => {
-                                            e.preventDefault();
-                                            setSelectedChat(chat);
-                                            markChatAsRead(chat.id);
-                                        }}>
-                                            <p>{chat.chat_name}</p>
-                                            <p className="text-red-300">NEW</p>
-                                        </div>
-                                    ) : (
-                                        <li key={chat.id} onClick={() => {
-                                            setSelectedChat(chat);
-                                            markChatAsRead(chat.id);
-                                        }} className="chat-name">
-                                            {chat.chat_name}
+                                chats && chats.length > 0 ? chats.map(chat => {
+                                    const isUnread = unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && (selectedChat === null || chat.id != selectedChat.id);
+                                    return (
+                                        <li
+                                            key={chat.id}
+                                            className="chat-name flex items-center justify-between gap-2"
+                                            onClick={() => {
+                                                setSelectedChat(chat);
+                                                markChatAsRead(chat.id);
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <span>{chat.chat_name}</span>
+                                                {isUnread && <span className="text-red-300">NEW</span>}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    className="!bg-transparent hover:!bg-secondary"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        setEditingChat(chat);
+                                                        setChatMembers([]); // Reset chat members
+                                                        fetchChatMembers(chat.id);
+                                                        setShowEditModal(true);
+                                                    }}
+                                                    aria-label="Edit chat"
+                                                >
+                                                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+                                                        <path d="M4 21v-3.5L17.06 4.94a1.5 1.5 0 0 1 2.12 2.12L6.12 19.62H4z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className="!bg-transparent hover:!bg-red-400"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        handleDeleteChat(chat.id);
+                                                    }}
+                                                    aria-label="Delete chat"
+                                                >
+                                                    &times;
+                                                </button>
+                                            </div>
                                         </li>
-                                    )
-                                )) : <h2 className="text-gray-400">Your chats will appear here.</h2>
+                                    );
+                                }) : <h2 className="text-gray-400">Your chats will appear here.</h2>
                             }
                         </ul>
                     </div>
-                    <FAB onClick={() => setShowModal(true)} />
+                    <FAB onClick={() => setShowSearchModal(true)} />
 
-                    {showModal && (
-                        <SearchModal
-                            show={showModal}
+                    {showSearchModal && (
+                        <Modal
+                            show={showSearchModal}
                             onClose={async () => {
-                                setShowModal(false);
+                                setShowSearchModal(false);
                                 setSearchResults([]);
                                 setSelectedUsers([]);
                                 fetchChats().then((chats) => {
@@ -320,11 +414,36 @@ export default function Chats() {
                                     }
                                 });
                             }}
-                            onSearch={handleSearch}
-                            searchResults={searchResults}
+                            onSubmit={handleSearch}
+                            results={searchResults}
                             onUserSelect={handleUserSelect}
                             selectedUsers={selectedUsers}
                             token={token}
+                        />
+                    )}
+
+                    {showEditModal && editingChat && (
+                        <Modal
+                            show={showEditModal}
+                            onClose={async () => {
+                                setShowEditModal(false);
+                                setEditingChat(null);
+                                setChatMembersData([]);
+                                setChatMembers([]);
+                            }}
+                            onSubmit={handleSearch}
+                            results={searchResults}
+                            onUserSelect={() => { }} // Not used in edit mode
+                            selectedUsers={chatMembers}
+                            token={token}
+                            isEditMode={true}
+                            editingChat={editingChat}
+                            currentMembers={chatMembersData}
+                            onChatUpdate={(updatedData) => {
+                                handleEditChat(editingChat.id, updatedData);
+                                setShowEditModal(false);
+                                setEditingChat(null);
+                            }}
                         />
                     )}
                 </div>
