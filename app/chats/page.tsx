@@ -156,7 +156,7 @@ export default function Chats() {
                 eventSource.close();
             }
         };
-    }, [token]);
+    }, [token, unreadMessages]);
 
     const handleSearch = async (query) => {
         if (!query || query.trim() === "") {
@@ -215,7 +215,7 @@ export default function Chats() {
             }
 
             const json = await res.json();
-            console.log("Message sent:", json);
+            setChatMessages(prevMessages => [...prevMessages, json]);
             return json;
         } catch (error) {
             console.error('Failed to send message:', error);
@@ -283,7 +283,7 @@ export default function Chats() {
                         <ul>
                             {
                                 chats && chats.length > 0 ? chats.map(chat => (
-                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && chat.id != selectedChat ? (
+                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && (selectedChat === null || chat.id != selectedChat.id) ? (
                                         <div className="flex gap-2 chat-name" key={chat.id} onClick={(e) => {
                                             e.preventDefault();
                                             setSelectedChat(chat);
