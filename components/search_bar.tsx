@@ -17,7 +17,7 @@ export default function SearchModal({ show, onClose, onSearch, searchResults, on
                 },
                 body: JSON.stringify({
                     chat_name: chatName,
-                    chat_members: selectedUsers.map(user => user.id)
+                    chat_members: selectedUsers.map(user => +user.id)
                 })
             });
 

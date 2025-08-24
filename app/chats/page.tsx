@@ -221,7 +221,7 @@ export default function Chats() {
         <div className="w-full h-screen gap-4 bg-black text-blue-300 font-mono text-4xl flex justify-center items-center">
             <div className="flex w-full h-screen gap-4">
                 <div className="w-1/3 h-screen px-6 py-8 flex flex-col gap-3 items-start justify-start bg-gray-900 relative">
-                    <h1 className="text-gray-100 text-4xl">Hello, {userdata?.full_name} ({userdata?.user_name})!</h1>
+                    <h1 className="text-gray-100 text-4xl">Hello, {userdata?.fullname} ({userdata?.username})!</h1>
                     <div className="flex-1 overflow-y-auto w-full">
                         <ul>
                             {
@@ -282,7 +282,7 @@ export default function Chats() {
                                         <ul>
                                             {chatMessages.map(message => (
                                                 <li key={message.id} className="text-gray-200 my-2">
-                                                    <strong>{message.sender_id}:</strong> {message.content}
+                                                    <strong>{message.username}:</strong> {message.content}
                                                 </li>
                                             ))}
                                         </ul>

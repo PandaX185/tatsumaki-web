@@ -20,7 +20,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ user_name: username, password })
+        body: JSON.stringify({ username: username, password })
       });
       const json = await res.json()
       if (json.code > 200) {
@@ -42,7 +42,7 @@ export default function Home() {
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({ user_name: username, password, full_name: fullname })
+          body: JSON.stringify({ username: username, password, fullname: fullname })
         });
         const json = await res.json()
         if (json.code > 200) {
