@@ -5,7 +5,7 @@ import MessageInput from "@/components/message_input";
 import Modal from "@/components/modal";
 import { time } from "console";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 export default function Chats() {
     const searchParams = useSearchParams();
@@ -22,6 +22,7 @@ export default function Chats() {
     const [chatMembers, setChatMembers] = useState([]);
     const [editingChat, setEditingChat] = useState(null);
     const [chatMembersData, setChatMembersData] = useState([]);
+    const messagesEndRef = useRef(null);
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -121,7 +122,14 @@ export default function Chats() {
                 const message = JSON.parse(event.data);
 
                 if (selectedChat && message.chat_id === selectedChat.id) {
-                    setChatMessages(prevMessages => [...prevMessages, message]);
+                    setChatMessages(prevMessages => {
+                        // Check if message already exists to prevent duplicates
+                        const messageExists = prevMessages.some(msg => msg.id === message.id);
+                        if (messageExists) {
+                            return prevMessages;
+                        }
+                        return [...prevMessages, message];
+                    });
                 }
 
                 setChats(prevChats => {
@@ -218,7 +226,14 @@ export default function Chats() {
             }
 
             const json = await res.json();
-            setChatMessages(prevMessages => [...prevMessages, json]);
+            setChatMessages(prevMessages => {
+                // Check if message already exists to prevent duplicates
+                const messageExists = prevMessages.some(msg => msg.id === json.id);
+                if (messageExists) {
+                    return prevMessages;
+                }
+                return [...prevMessages, json];
+            });
             return json;
         } catch (error) {
             console.error('Failed to send message:', error);
@@ -292,6 +307,8 @@ export default function Chats() {
         }
 
         setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
+        setChatMessages([]);
+        setSelectedChat(null);
     };
 
     const handleEditChat = (chatId, updatedBody) => {
@@ -340,37 +357,62 @@ export default function Chats() {
         }
     };
 
+    // Auto-scroll to bottom when messages change
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [chatMessages]);
+
     return (
-        <div className="w-full h-screen gap-4 flex justify-center items-center">
-            <div className="flex w-full h-screen gap-4">
-                <div className="side-area w-1/3 items-start justify-start relative">
-                    <h1>Hello, {userdata?.fullname} ({userdata?.username})!</h1>
+        <div className="w-full h-screen flex flex-col lg:flex-row">
+            <div className="lg:hidden bg-area p-4 border-b border-gray-700">
+                <h1 className="text-lg font-semibold">
+                    Hello, {userdata?.fullname} ({userdata?.username})!
+                </h1>
+                {selectedChat && (
+                    <div className="mt-2 text-sm text-gray-300">
+                        Currently viewing: {selectedChat.chat_name}
+                    </div>
+                )}
+            </div>
+
+            <div className="flex flex-1 flex-col lg:flex-row h-full lg:gap-4">
+                <div className={`side-area ${selectedChat ? 'hidden lg:flex' : 'flex'} lg:w-1/3 w-full flex-col relative`}>
+                    <div className="hidden lg:block">
+                        <h1 className="text-lg font-semibold mb-4">
+                            Hello, {userdata?.fullname} ({userdata?.username})!
+                        </h1>
+                    </div>
+
                     <div className="flex-1 overflow-y-auto w-full">
-                        <ul>
+                        <ul className="space-y-2">
                             {
                                 chats && chats.length > 0 ? chats.map(chat => {
                                     const isUnread = unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.chat_id).includes(chat.id) && (selectedChat === null || chat.id != selectedChat.id);
                                     return (
                                         <li
                                             key={chat.id}
-                                            className="chat-name flex items-center justify-between gap-2"
+                                            className="chat-name flex items-center justify-between gap-2 p-3 hover:border rounded-lg cursor-pointer"
                                             onClick={() => {
                                                 setSelectedChat(chat);
                                                 markChatAsRead(chat.id);
                                             }}
                                         >
-                                            <div className="flex items-center gap-2 flex-1">
-                                                <span>{chat.chat_name}</span>
-                                                {isUnread && <span className="text-red-300">NEW</span>}
+                                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                <span className="truncate text-sm lg:text-base">{chat.chat_name}</span>
+                                                {isUnread && <span className="text-red-300 text-xs lg:text-sm flex-shrink-0">NEW</span>}
                                             </div>
-                                            <div className="flex items-center gap-1">
+                                            <div className="flex items-center gap-1 flex-shrink-0">
                                                 <button
                                                     type="button"
                                                     className="!bg-transparent hover:!bg-secondary"
                                                     onClick={e => {
                                                         e.stopPropagation();
                                                         setEditingChat(chat);
-                                                        setChatMembers([]); // Reset chat members
+                                                        setChatMembers([]);
                                                         fetchChatMembers(chat.id);
                                                         setShowEditModal(true);
                                                     }}
@@ -433,7 +475,7 @@ export default function Chats() {
                             }}
                             onSubmit={handleSearch}
                             results={searchResults}
-                            onUserSelect={() => { }} // Not used in edit mode
+                            onUserSelect={() => { }}
                             selectedUsers={chatMembers}
                             token={token}
                             isEditMode={true}
@@ -448,43 +490,65 @@ export default function Chats() {
                     )}
                 </div>
                 {selectedChat ? (
-                    <div className="side-area !pt-0 space-between w-2/3">
-                        <div className="w-full h-screen flex flex-col">
-                            <h1 className="text-center mb-6">{selectedChat?.chat_name}</h1>
-                            <div className="flex-1 overflow-y-auto max-h-[80vh]">
-                                {chatMessages.length > 0 ? (
-                                    <ul>
-                                        {chatMessages.map(message => (
-                                            <li key={message.id} className="flex items-center gap-4 w-full text-gray-200 my-2 border border-gray-700 px-3 py-1">
-                                                <strong className={
-                                                    message.sender_id == userdata?.id ? "text-secondary border-r w-1/15 break-words max-w-[70%]" : "text-main border-r w-1/15 break-words max-w-[70%]"
-                                                }>{message.username}
-                                                </strong>
-                                                <div className="flex w-full justify-between items-center">
-                                                    <p>
+                    <div className={`${selectedChat ? 'flex' : 'hidden lg:flex'} lg:w-2/3 w-full flex-col h-full`}>
+                        <div className="flex items-center p-4 border-b border-gray-700 bg-area">
+                            <button
+                                className="lg:hidden mr-3 text-gray-400 hover:text-white"
+                                onClick={() => setSelectedChat(null)}
+                                aria-label="Back to chat list"
+                            >
+                                <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                                </svg>
+                            </button>
+                            <h1 className="text-lg lg:text-xl font-semibold">{selectedChat?.chat_name}</h1>
+                        </div>
+
+                        <div className="side-area flex-1 overflow-y-auto p-4">
+                            {chatMessages.length > 0 ? (
+                                <div className="space-y-3">
+                                    {chatMessages.map((message, index) => (
+                                        <div
+                                            key={`message-${message.id || index}-${index}`}
+                                            className={`flex ${message.sender_id == userdata?.id ? 'justify-end' : 'justify-start'}`}
+                                        >
+                                            <div className={`max-w-[80%] lg:max-w-[70%] rounded-lg p-3 ${message.sender_id == userdata?.id
+                                                ? 'bg-main'
+                                                : 'bg-secondary'
+                                                }`}>
+                                                <div className="flex flex-col">
+                                                    <div className="text-xs opacity-75 mb-1">
+                                                        {message.username}
+                                                    </div>
+                                                    <div className="text-sm lg:text-base break-words">
                                                         {message.content}
-                                                    </p>
-                                                    <div className="flex flex-col items-end">
-                                                        <p className="invisible ">{message.content}</p>
-                                                        <p className="text-sm text-gray-400 ml-4">
-                                                            {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </p>
+                                                    </div>
+                                                    <div className="text-xs opacity-60 mt-1 text-right">
+                                                        {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                     </div>
                                                 </div>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                ) : (
-                                    <div className="text-gray-400">No messages.</div>
-                                )}
-                            </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <div ref={messagesEndRef} />
+                                </div>
+                            ) : (
+                                <div className="text-gray-400 text-center py-8">No messages yet. Start the conversation!</div>
+                            )}
                         </div>
-                        <MessageInput onSendMessage={handleSendMessage} />
+
+                        <div className="pb-4 px-4 bg-area">
+                            <MessageInput onSendMessage={handleSendMessage} />
+                        </div>
                     </div>
                 ) : (
-                    <div className="side-area space-between w-2/3 p-6">
-                        <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
-                        <div className="text-gray-400">Select a chat to view messages.</div>
+                    <div className="hidden lg:flex lg:w-2/3 w-full flex-col items-center justify-center p-6 text-center">
+                        <div className="max-w-md">
+                            <h2 className="text-gray-100 text-xl lg:text-2xl mb-4">Welcome to Chat</h2>
+                            <div className="text-gray-400 text-sm lg:text-base">
+                                Select a chat from the sidebar to start messaging, or create a new chat to get started.
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

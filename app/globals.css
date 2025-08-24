@@ -4,10 +4,10 @@
 :root {
   --foreground: #ffffff;
   --background: #171717;
-  --main-color: #1C6EA4;
-  --secondary-color: #FFF9AF;
+  --main-color: #1c40a4;
+  --secondary-color: #1c6d76;
   --area-color: oklch(21% 0.034 264.665);
-  --text-color: #dedbb9;
+  --text-color: #FFFFFF;
 }
 
 @theme inline {
