@@ -122,15 +122,17 @@ export default function Chats() {
                 }
 
                 setChats(prevChats => {
-                    if (!prevChats) return prevChats;
-                    const targetChat = prevChats.find(chat => chat.id === message.chat_id);
-                    if (targetChat && (!selectedChat || message.chat_id !== selectedChat.id)) {
-                        setUnreadMessages(prevUnread => {
-                            if (!prevUnread) return [message.chat_id];
-                            console.log("prevUnread:", prevUnread);
-                            return [...prevUnread, message.chat_id];
-                        });
+                    if (prevChats) {
+                        const targetChat = prevChats.find(chat => chat.id === message.chat_id);
+                        if (targetChat && (!selectedChat || message.chat_id !== selectedChat.id)) {
+                            setUnreadMessages(prevUnread => {
+                                if (!prevUnread) return [message.chat_id];
+                                return [...prevUnread, message.chat_id];
+                            });
+                            return prevChats;
+                        }
                     }
+                    fetchChats();
                     return prevChats;
                 });
             });
