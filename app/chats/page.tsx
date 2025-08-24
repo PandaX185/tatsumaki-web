@@ -3,6 +3,7 @@
 import FAB from "@/components/fab";
 import MessageInput from "@/components/message_input";
 import SearchModal from "@/components/search_bar";
+import { time } from "console";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -13,7 +14,7 @@ export default function Chats() {
     const [chats, setChats] = useState([]);
     const [selectedChat, setSelectedChat] = useState(null);
     const [chatMessages, setChatMessages] = useState([]);
-    const [notifiedChat, setNotifiedChat] = useState(null);
+    const [unreadMessages, setUnreadMessages] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
     const [showModal, setShowModal] = useState(false);
     const [selectedUsers, setSelectedUsers] = useState([]);
@@ -82,6 +83,7 @@ export default function Chats() {
                 });
 
                 if (!res.ok) {
+                    console.log(res);
                     throw new Error(`HTTP error! status: ${res.status}`);
                 }
 
@@ -114,8 +116,6 @@ export default function Chats() {
 
             eventSource.addEventListener("msg", (event) => {
                 const message = JSON.parse(event.data);
-                console.log("Selected chat ID:", selectedChat?.id);
-                console.log("New message received:", message);
 
                 if (selectedChat && message.chat_id === selectedChat.id) {
                     setChatMessages(prevMessages => [...prevMessages, message]);
@@ -125,7 +125,11 @@ export default function Chats() {
                     if (!prevChats) return prevChats;
                     const targetChat = prevChats.find(chat => chat.id === message.chat_id);
                     if (targetChat && (!selectedChat || message.chat_id !== selectedChat.id)) {
-                        setNotifiedChat(message.chat_id);
+                        setUnreadMessages(prevUnread => {
+                            if (!prevUnread) return [message.chat_id];
+                            console.log("prevUnread:", prevUnread);
+                            return [...prevUnread, message.chat_id];
+                        });
                     }
                     return prevChats;
                 });
@@ -180,9 +184,8 @@ export default function Chats() {
     };
 
     const handleUserSelect = (user) => {
-        console.log("Selected user:", user);
         setSelectedUsers((prevSelected) => {
-            if (prevSelected.some(u => u.id === user.id)) return prevSelected;
+            if (prevSelected.some(u => u.id === user.id)) return prevSelected.filter(u => u.id !== user.id);
             return [...prevSelected, user];
         });
     };
@@ -217,38 +220,54 @@ export default function Chats() {
         }
     };
 
+    useEffect(() => {
+        fetch(`${API_BASE_URL}/api/messages/unread`, {
+            method: "GET",
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        })
+            .then((res) => {
+                return res.json();
+            })
+            .then((data) => {
+                setUnreadMessages(data);
+            })
+            .catch((error) => {
+                console.error('Failed to fetch unread chats:', error);
+            });
+    }, [token]);
+
     return (
-        <div className="w-full h-screen gap-4 bg-black text-blue-300 font-mono text-4xl flex justify-center items-center">
+        <div className="w-full h-screen gap-4 flex justify-center items-center">
             <div className="flex w-full h-screen gap-4">
-                <div className="w-1/3 h-screen px-6 py-8 flex flex-col gap-3 items-start justify-start bg-gray-900 relative">
-                    <h1 className="text-gray-100 text-4xl">Hello, {userdata?.fullname} ({userdata?.username})!</h1>
+                <div className="side-area w-1/3 items-start justify-start relative">
+                    <h1>Hello, {userdata?.fullname} ({userdata?.username})!</h1>
                     <div className="flex-1 overflow-y-auto w-full">
                         <ul>
                             {
                                 chats && chats.length > 0 ? chats.map(chat => (
-                                    chat.id === notifiedChat ? (
+                                    unreadMessages && unreadMessages.length > 0 && unreadMessages.map(unreadChat => unreadChat.id).includes(chat.id) ? (
                                         <div className="flex gap-2" key={chat.id}>
-                                            <li className="text-gray-200 font-bold my-3">
-                                                <a href="#" onClick={() => {
+                                            <li className="chat-name">
+                                                <a href="#" onClick={(e) => {
+                                                    e.preventDefault();
                                                     setSelectedChat(chat);
-                                                    setNotifiedChat(null);
                                                 }}>{chat.chat_name}</a>
                                             </li>
                                             <p className="text-red-300">NEW</p>
                                         </div>
                                     ) : (
-                                        <li key={chat.id} className="text-gray-200 my-3">
-                                            <a href="#" onClick={() => {
-                                                if (chat.id == notifiedChat) setNotifiedChat(null);
-                                                setSelectedChat(chat);
-                                            }}>{chat.chat_name}</a>
+                                        <li key={chat.id} onClick={() => {
+                                            setSelectedChat(chat);
+                                        }} className="chat-name">
+                                            {chat.chat_name}
                                         </li>
                                     )
                                 )) : <h2 className="text-gray-400">Your chats will appear here.</h2>
                             }
                         </ul>
                     </div>
-
                     <FAB onClick={() => setShowModal(true)} />
 
                     {showModal && (
@@ -272,34 +291,46 @@ export default function Chats() {
                         />
                     )}
                 </div>
-                <div className="flex flex-col space-between h-screen w-2/3 bg-gray-900 p-6">
-                    <div className="w-full h-screen flex flex-col-reverse">
-                        <div className="flex-1 overflow-y-auto">
-                            {selectedChat ? (
-                                <>
-                                    <h2 className="text-gray-100 text-2xl mb-4">{selectedChat?.chat_name}</h2>
-                                    {chatMessages.length > 0 ? (
-                                        <ul>
-                                            {chatMessages.map(message => (
-                                                <li key={message.id} className="text-gray-200 my-2">
-                                                    <strong>{message.username}:</strong> {message.content}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <div className="text-gray-400">No messages.</div>
-                                    )}
-                                </>
-                            ) : (
-                                <>
-                                    <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
-                                    <div className="text-gray-400">Select a chat to view messages.</div>
-                                </>
-                            )}
+                {selectedChat ? (
+                    <div className="side-area !pt-0 space-between w-2/3">
+                        <div className="w-full h-screen flex flex-col">
+                            <h1 className="text-center mb-6">{selectedChat?.chat_name}</h1>
+                            <div className="flex-1 overflow-y-auto max-h-[80vh]">
+                                {chatMessages.length > 0 ? (
+                                    <ul>
+                                        {chatMessages.map(message => (
+                                            <li key={message.id} className="flex items-center gap-4 w-full text-gray-200 my-2 border border-gray-700 px-3 py-1">
+                                                <strong className={
+                                                    message.sender_id == userdata?.id ? "text-secondary border-r w-1/15 break-words max-w-[70%]" : "text-main border-r w-1/15 break-words max-w-[70%]"
+                                                }>{message.username}
+                                                </strong>
+                                                <div className="flex w-full justify-between items-center">
+                                                    <p>
+                                                        {message.content}
+                                                    </p>
+                                                    <div className="flex flex-col items-end">
+                                                        <p className="invisible ">{message.content}</p>
+                                                        <p className="text-sm text-gray-400 ml-4">
+                                                            {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                ) : (
+                                    <div className="text-gray-400">No messages.</div>
+                                )}
+                            </div>
                         </div>
+                        <MessageInput onSendMessage={handleSendMessage} />
                     </div>
-                    <MessageInput onSendMessage={handleSendMessage} token={token} chatId={selectedChat?.id} />
-                </div>
+                ) : (
+                    <div className="side-area space-between w-2/3 p-6">
+                        <h2 className="text-gray-100 text-2xl mb-4">Chat Messages</h2>
+                        <div className="text-gray-400">Select a chat to view messages.</div>
+                    </div>
+                )}
             </div>
         </div>
     );
