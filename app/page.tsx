@@ -62,7 +62,15 @@ export default function Home() {
   return (
     <div className="w-full h-screen flex justify-center items-center">
       <div className="flex flex-col gap-10">
-        <h1>Tatsumaki Chat</h1>
+        <div className="flex flex-col gap-10 items-center">
+          <img
+            src="/images/logo.png"
+            alt="Tatsumaki Logo"
+            className="h-50 w-50 mr-3 animate-spin"
+            style={{ objectFit: "contain", animationDuration: "1.5s" }}
+          />
+          <h1>Tatsumaki Chat</h1>
+        </div>
         <form className="flex flex-col gap-5" onSubmit={isRegistering ? handleRegister : handleLogin}>
           <input
             type="text"

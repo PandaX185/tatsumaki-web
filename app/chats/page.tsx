@@ -5,9 +5,9 @@ import MessageInput from "@/components/message_input";
 import Modal from "@/components/modal";
 import { time } from "console";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 
-export default function Chats() {
+function ChatsContent() {
     const searchParams = useSearchParams();
     const token = searchParams.get("token");
     const [userdata, setUserData] = useState(null);
@@ -544,7 +544,15 @@ export default function Chats() {
                 ) : (
                     <div className="hidden lg:flex lg:w-2/3 w-full flex-col items-center justify-center p-6 text-center">
                         <div className="max-w-md">
-                            <h2 className="text-gray-100 text-xl lg:text-2xl mb-4">Welcome to Chat</h2>
+                            <div className="flex items-center justify-center mb-4">
+                                <img
+                                    src="/images/logo.png"
+                                    alt="Tatsumaki Logo"
+                                    className="h-10 w-10 mr-3 animate-spin"
+                                    style={{ objectFit: "contain", animationDuration: "1.5s" }}
+                                />
+                                <h2 className="text-gray-100 text-xl lg:text-2xl">Tatsumaki Chat</h2>
+                            </div>
                             <div className="text-gray-400 text-sm lg:text-base">
                                 Select a chat from the sidebar to start messaging, or create a new chat to get started.
                             </div>
@@ -553,5 +561,13 @@ export default function Chats() {
                 )}
             </div>
         </div>
+    );
+}
+
+export default function Chats() {
+    return (
+        <Suspense fallback={<div className="w-full h-screen flex items-center justify-center">Loading...</div>}>
+            <ChatsContent />
+        </Suspense>
     );
 }
